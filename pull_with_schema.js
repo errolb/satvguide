@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-var request = require('request'),   // http
-    cheerio = require('cheerio'),   // html parsing
-    fs      = require('fs'),        // filesystem
-    colors  = require('colors');    //   colors for debugging
+var request             = require('request'),   // http
+    cheerio             = require('cheerio'),   // html parsing
+    fs                  = require('fs'),        // filesystem
+    colors              = require('colors');    //   colors for debugging
 
 // set DB params
 var db_port             = '27017',
@@ -22,13 +22,13 @@ db.connect(db_address);
 
 
 // read secret_target
-fs.readFile('secret_target', 'utf8', readSecretFileDone);   
+fs.readFile('secret_target', 'utf8', readSecretFileDone);
 
 var urls = [];
 
 function readSecretFileDone(err, data){
     if (err) throw err;
-    
+
     urls = generateURLs(data);
     loopRequest(urls);
 }
@@ -39,9 +39,9 @@ function generateURLs(read_file){
         submit_key      = "fSubmit",
         day_key         = "fDay",
         channel_name    = "fChannel";
-    
-    var submit_value    = 1, 
-        week            = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], 
+
+    var submit_value    = 1,
+        week            = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
         channel_value   = [1,2,3,4,5];
 
     var urls = [];
@@ -54,7 +54,7 @@ function generateURLs(read_file){
                             + channel_name  +   "=" +   channel_value[channel];
             urls.push(full_target);
         }
-    }   
+    }
 
     return urls;
 }
@@ -68,14 +68,14 @@ function requestDone(scrape_response, url_index, day){
     $("td").each(function(){
         dirty_schedule.push($(this).text());
     });
-    
+
     var clean_schedule = dirty_schedule.filter(function(v){
         return /\w/.test(v);
     });
 
     // a clean array of the day's schedule
     clean_schedule = clean_schedule.slice(4,clean_schedule.length);
-    
+
     // create timeslot chunks.
     var time_slot_chunks = [];
     for (var i=0, x=0; i < clean_schedule.length; i=i+5, x++){
@@ -91,7 +91,7 @@ function requestDone(scrape_response, url_index, day){
     // channel's key value, like "sabc1", "sabc2", "etv" etc.
     var channel_name                    = clean_schedule[0].toLowerCase().replace(/ /g,''),
     day_channel_schedule                = {};
-    
+
     day_channel_schedule[channel_name]  = time_slot_chunks;
 
     populateDB(day_channel_schedule, channel_name, url_index, day);
@@ -105,9 +105,9 @@ function populateDB(day_channel_schedule, channel_name, url_index, day){
     var data                    = {};
     data[day]                   = {};
     data[day][channel_name]     = day_channel_schedule[channel_name];
-    
+
     var query = {day: day};
-    
+
     db.scrapedData.save(query, function(err, doc){
       doc[day] = data[day]
       db.scrapedData.save(doc, function(err, doc){

@@ -34,6 +34,11 @@
   function fsOnceFileRead(err, data) {
     if (err) throw err;
 
+    onceTargetsAcquired();
+  }
+
+  function onceTargetsAcquired() {
+
     var TVAPP = (function(){
       this.schema = new mongoose.Schema({
           channel:  String,
