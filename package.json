@@ -6,6 +6,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "Errol Burger",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^0.17.0",
+    "colors": "^0.6.2",
+    "mongoose": "3.8.13",
+    "request": "^2.38.0"
+  }
 }

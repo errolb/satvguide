@@ -1,50 +1,72 @@
 #!/usr/bin/env node
 
-var mongoose = require('mongoose'),
-    moment = require('moment'),
-    colors = require('colors');
+;(function() {
 
-var db_port             = '27017',
-    db_name             = /*'tvguidedb'*/"testgoose",
-    db_base_location    = "mongodb://localhost";
-var db_address          = db_base_location + ':' + db_port + '/' + db_name;
+  var mongoose = require('mongoose'),
+      moment = require('moment'),
+      cheerio = require('cheerio'),
+      fs = require('fs'),
+      util = require('util'),
+      colors = require('colors');
 
-// console.log(db_address);
+  // DB
+  var db_address = (function(){
+    var db_port = '27017',
+        db_name = /*'tvguidedb'*/"testgoose",
+        db_base_location  = "mongodb://localhost";
+    return db_base_location + ':' + db_port + '/' + db_name;
+  })();
 
-mongoose.connect(db_address);
-var db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function callback () {
-  interactWidthDB();
-});
+  mongoose.connect(db_address);
+  var db = mongoose.connection;
 
-function interactWidthDB() {
+  db.on('error', console.error.bind(console, 'connection error:'));
 
-    // Create the Schema
-    var tvSchema = new mongoose.Schema({
-        channel:  String,
-        date: { type: Date },
-        timeslots:[{
-            time : { type: Date },
-            title : String,
-            mprs : String,
-            description : String,
-            timeslot_id : Number
-        }]
-    });
+  db.once('open', function () {
+    dbOnceOpen();
+  });
 
-    // Create the model
-    var tvModel = mongoose.model('tvModel', tvSchema);
+  function dbOnceOpen() {
+    fs.readFile('secret_target', 'utf8', fsOnceFileRead);
+  }
 
-    /*fake data*/
+  // PRIMARY LOGIC
+  function fsOnceFileRead(err, data) {
+    if (err) throw err;
 
-    activeData = {
+    var TVAPP = (function(){
+      this.schema = new mongoose.Schema({
+          channel:  String,
+          date: { type: Date },
+          timeslots:[{
+              time : { type: Date },
+              title : String,
+              mprs : String,
+              description : String,
+              timeslot_id : Number
+          }]
+      });
+
+      return  { _root: this,
+                model: mongoose.model('schedule', this.schema),
+                activeData: {},
+                logic: {
+                  addSchedule: addSchedule
+                }
+              }
+    })();
+
+    // TODO replace fake data
+    TVAPP.activeData = {
         channel: "SABC 1",
         date: moment().format("YYYY-MM-DD"),
+        days: function(days){
+          return moment(this.date).add('days', days).format("YYYY-MM-DD")
+        },
         timeslots : [
             {
                 time: moment().format("YYYY-MM-DD"),
-                title: "McDonnalds docu",
+                title: "McDonnalds document over here, dude",
                 mprs: "PG",
                 description: "Monkey man lives again.",
                 timeslot_id: 1234
@@ -52,59 +74,43 @@ function interactWidthDB() {
         ]
     };
 
-    /* /fake data */
+    TVAPP.model.findOne({$and:[{date: {$gte: TVAPP.activeData.date, $lt: TVAPP.activeData.days(1)}},{channel: TVAPP.activeData.channel}]}, function(err, doc) {
 
-    /*find and write data*/
-    var dateBegin = moment().format("YYYY-MM-DD");
-    var dateEnd = moment().add('days', 1).format("YYYY-MM-DD");
-
-    var channelName = "SABC 1";
-    
-    tvModel.findOne({$and:[{date: {$gte: dateBegin, $lt: dateEnd}},{channel: channelName}]}, function(err, doc) {
         if (err) console.log(err);
-        // console.log(doc);
-        // db.close();
+
+        // only add new doc if it doesn't exist.
         if (doc !== null) {
-            createOrUpdate(false, doc);
+            console.log('document already exists'.blue)
+            db.close();
         } else {
-            createOrUpdate(true, doc);
+            TVAPP.logic.addSchedule();
         }
     });
-    /* /find and write data*/
 
-    //
-    function createOrUpdate(dbEntryIsNew, foundDoc) {
-        var timeslots = activeData.timeslots;
-        
-        if (dbEntryIsNew) {
-            
-            //build new db entry
-            writeModel = new tvModel({
-                channel: activeData.channel,
-                date: activeData.date,
-                timeslots : []
-            });
 
-            writeModel.timeslots = timeslots;
-            
-            // write new obj to db
-            writeModel.save(function (err) {
-                if (err) return console.error(err);
-                console.log("write success".rainbow);
-                console.log('new object created'.green);
-                db.close();
-            });
-        } else {
-            foundDoc.channel = activeData.channel;
-            foundDoc.date = activeData.date;
-            foundDoc.timeslots = timeslots;
-            foundDoc.save(function(err, doc){
-                console.log('object updated'.blue);
-                console.log(doc);
-                db.close();
-            });
-        }
+    function addSchedule() {
+
+      var timeslots = TVAPP.activeData.timeslots;
+
+      //build new db entry
+      freshDoc = new TVAPP.model({
+          channel: TVAPP.activeData.channel,
+          date: TVAPP.activeData.date,
+          timeslots : []
+      });
+
+      freshDoc.timeslots = timeslots;
+
+      // write new obj to db
+      freshDoc.save(function (err) {
+          if (err) return console.error(err);
+          console.log("write success".rainbow);
+          console.log('new object created'.green);
+          db.close();
+      });
     }
 
-    //
-}
+  }
+  // /PRIMARY LOGIC
+
+})();
