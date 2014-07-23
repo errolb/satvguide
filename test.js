@@ -20,6 +20,30 @@
   mongoose.connect(db_address);
   var db = mongoose.connection;
 
+  // create base obj
+  var TVAPP = (function(){
+    this.schema = new mongoose.Schema({
+        channel:  String,
+        date: { type: Date },
+        timeslots:[{
+            time : { type: Date },
+            title : String,
+            mprs : String,
+            description : String,
+            timeslot_id : Number
+        }]
+    });
+
+    return  { _root: this,
+              targets:[],
+              model: mongoose.model('schedule', this.schema),
+              activeData: {},
+              logic: {
+                addDocument: addDocument
+              }
+            }
+  })();
+
   db.on('error', console.error.bind(console, 'connection error:'));
 
   db.once('open', function () {
@@ -34,34 +58,37 @@
   function fsOnceFileRead(err, data) {
     if (err) throw err;
 
+    TVAPP.targets = (function() {
+      var base_target     =  data.toString(),
+          submit_key      = "fSubmit",
+          day_key         = "fDay",
+          channel_name    = "fChannel";
+
+      var submit_value    = 1,
+          week            = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+          channel_value   = [1,2,3,4,5];
+
+      var urls = [];
+
+      for (day in week) {
+          for (channel in channel_value){
+              var full_target = base_target   +   "?"
+                              + submit_key    +   "=" +   submit_value    + "&"
+                              + day_key       +   "=" +   week[day]       + "&"
+                              + channel_name  +   "=" +   channel_value[channel];
+              urls.push(full_target);
+          }
+      }
+
+      return urls;
+    })();
+
     onceTargetsAcquired();
   }
 
   function onceTargetsAcquired() {
 
-    var TVAPP = (function(){
-      this.schema = new mongoose.Schema({
-          channel:  String,
-          date: { type: Date },
-          timeslots:[{
-              time : { type: Date },
-              title : String,
-              mprs : String,
-              description : String,
-              timeslot_id : Number
-          }]
-      });
-
-      return  { _root: this,
-                model: mongoose.model('schedule', this.schema),
-                activeData: {},
-                logic: {
-                  addSchedule: addSchedule
-                }
-              }
-    })();
-
-    // TODO replace fake data
+    // TODO: scraping should begin here
     TVAPP.activeData = {
         channel: "SABC 1",
         date: moment().format("YYYY-MM-DD"),
@@ -88,34 +115,33 @@
             console.log('document already exists'.blue)
             db.close();
         } else {
-            TVAPP.logic.addSchedule();
+            TVAPP.logic.addDocument();
         }
     });
 
-
-    function addSchedule() {
-
-      var timeslots = TVAPP.activeData.timeslots;
-
-      //build new db entry
-      freshDoc = new TVAPP.model({
-          channel: TVAPP.activeData.channel,
-          date: TVAPP.activeData.date,
-          timeslots : []
-      });
-
-      freshDoc.timeslots = timeslots;
-
-      // write new obj to db
-      freshDoc.save(function (err) {
-          if (err) return console.error(err);
-          console.log("write success".rainbow);
-          console.log('new object created'.green);
-          db.close();
-      });
-    }
-
   }
   // /PRIMARY LOGIC
+
+  function addDocument() {
+
+    var timeslots = TVAPP.activeData.timeslots;
+
+    //build new db entry
+    freshDoc = new TVAPP.model({
+        channel: TVAPP.activeData.channel,
+        date: TVAPP.activeData.date,
+        timeslots : []
+    });
+
+    freshDoc.timeslots = timeslots;
+
+    // write new obj to db
+    freshDoc.save(function (err) {
+        if (err) return console.error(err);
+        console.log("write success".rainbow);
+        console.log('new object created'.green);
+        db.close();
+    });
+  }
 
 })();
