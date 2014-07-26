@@ -7,6 +7,7 @@
       cheerio = require('cheerio'),
       fs = require('fs'),
       util = require('util'),
+      request = require('request'),
       colors = require('colors');
 
   // DB
@@ -30,7 +31,7 @@
             title : String,
             mprs : String,
             description : String,
-            timeslot_id : Number
+            timeslot_id : String
         }]
     });
 
@@ -88,36 +89,85 @@
 
   function onceTargetsAcquired() {
 
-    // TODO: scraping should begin here
-    TVAPP.activeData = {
-        channel: "SABC 1",
-        date: moment().format("YYYY-MM-DD"),
-        days: function(days){
-          return moment(this.date).add('days', days).format("YYYY-MM-DD")
-        },
-        timeslots : [
-            {
-                time: moment().format("YYYY-MM-DD"),
-                title: "McDonnalds document over here, dude",
-                mprs: "PG",
-                description: "Monkey man lives again.",
-                timeslot_id: 1234
+    // begin scraping
+    request(TVAPP.targets[0], function(error, response, body) {
+      if (!error && response.statusCode == 200) {
+
+        $ = cheerio.load(body.replace(/\s{2,}/g, ""));
+        var whichKey = 0;
+        var timeslot = {};
+
+
+        // traversal and assignment. building active data
+        TVAPP.activeData = (function() {
+
+          return {
+            // _root: this,
+            channel: $("select[name='fChannel'] option[selected]").html(),
+            date: moment( new Date($("select[name='fDay'] option[selected]").html())).format(),
+            daysFromNow: function(days) {
+              return moment(this.date).add('days', days).format()
+            },
+            timeslots: []
+          }
+        })();
+
+        // build timeslots
+        $("table[bgcolor='#999999'] td").each(function(i, elem) {
+          var elemtext = $(elem).text();
+
+          if (i > 5 && $(elem).html() != '<b>&#xA0;</b>') {
+
+            switch(whichKey) {
+              case 0:
+                timeslot.channel = elemtext;
+                whichKey++;
+                break;
+              case 1:
+                timeslot.time = moment(TVAPP.activeData.date.slice(0,11) + elemtext + ':00').format();
+                whichKey++;
+                break;
+              case 2:
+                timeslot.title = elemtext;
+                whichKey++;
+                break;
+              case 3:
+                timeslot.msrp = elemtext;
+                whichKey++;
+                break;
+              case 4:
+                timeslot.description = elemtext;
+                whichKey++;
+                break;
             }
-        ]
-    };
 
-    TVAPP.model.findOne({$and:[{date: {$gte: TVAPP.activeData.date, $lt: TVAPP.activeData.days(1)}},{channel: TVAPP.activeData.channel}]}, function(err, doc) {
+            if (whichKey === 5) {
+              TVAPP.activeData.timeslots.push(timeslot);
+              whichKey = 0;
+              timeslot = {};
+            }
+          }
+        });
 
-        if (err) console.log(err);
 
-        // only add new doc if it doesn't exist.
-        if (doc !== null) {
-            console.log('document already exists'.blue)
-            db.close();
-        } else {
-            TVAPP.logic.addDocument();
-        }
+        // update db here
+        TVAPP.model.findOne({$and:[{date: {$gte: TVAPP.activeData.date, $lt: TVAPP.activeData.daysFromNow(1)}},{channel: TVAPP.activeData.channel}]}, function(err, doc) {
+
+            if (err) console.log(err);
+
+            // only add new doc if it doesn't exist.
+            if (doc !== null) {
+                console.log('document already exists'.blue)
+                db.close();
+            } else {
+                TVAPP.logic.addDocument();
+            }
+        });
+
+
+      }
     });
+
 
   }
   // /PRIMARY LOGIC
