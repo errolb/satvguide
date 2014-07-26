@@ -179,7 +179,7 @@
 
   function addDocument() {
 
-    var timeslots = TVAPP.activeData.timeslots;
+    // var timeslots = TVAPP.activeData.timeslots;
 
     //build new db entry
     freshDoc = new TVAPP.model({
@@ -188,7 +188,7 @@
         timeslots : []
     });
 
-    freshDoc.timeslots = timeslots;
+    freshDoc.timeslots = TVAPP.activeData.timeslots;
 
     // write new obj to db
     freshDoc.save(function (err) {
