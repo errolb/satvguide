@@ -2,3 +2,4 @@ secret_target
 bower_components
 node_modules
 data
+pull_with_schema.js
