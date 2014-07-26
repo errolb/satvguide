@@ -8,6 +8,7 @@
       fs = require('fs'),
       util = require('util'),
       request = require('request'),
+      uuid = require('node-uuid'),
       colors = require('colors');
 
   // DB
@@ -21,7 +22,7 @@
   mongoose.connect(db_address);
   var db = mongoose.connection;
 
-  // create base obj
+  // create base objs
   var TVAPP = (function(){
     this.schema = new mongoose.Schema({
         channel:  String,
@@ -90,6 +91,7 @@
   function onceTargetsAcquired() {
 
     // begin scraping
+    // loop through & request target URLs
     request(TVAPP.targets[0], function(error, response, body) {
       if (!error && response.statusCode == 200) {
 
@@ -137,11 +139,13 @@
                 break;
               case 4:
                 timeslot.description = elemtext;
+                timeslot.timeslot_id = uuid.v4();
                 whichKey++;
                 break;
             }
 
             if (whichKey === 5) {
+              // console.log(TVAPP.activeData);
               TVAPP.activeData.timeslots.push(timeslot);
               whichKey = 0;
               timeslot = {};
@@ -167,6 +171,7 @@
 
       }
     });
+    //end loop
 
 
   }
