@@ -8,8 +8,11 @@
       fs = require('fs'),
       util = require('util'),
       request = require('request'),
-      uuid = require('node-uuid'),
       colors = require('colors');
+
+  // track how many writes to DB.
+  var touchDB = 1;
+  var testcount = 0;
 
   // DB
   var db_address = (function(){
@@ -27,19 +30,16 @@
     this.schema = new mongoose.Schema({
         channel:  String,
         date: { type: Date },
-        timeslots:[{
-            time : { type: Date },
-            title : String,
-            mprs : String,
-            description : String,
-            timeslot_id : String
-        }]
+        title : String,
+        mprs : String,
+        description : String,
+        datewritten: { type: Date }
     });
 
     return  { _root: this,
               targets:[],
               model: mongoose.model('schedule', this.schema),
-              activeData: {},
+              activeData: [],
               logic: {
                 addDocument: addDocument
               }
@@ -92,110 +92,109 @@
 
     // begin scraping
     // loop through & request target URLs
-    request(TVAPP.targets[0], function(error, response, body) {
-      if (!error && response.statusCode == 200) {
 
-        $ = cheerio.load(body.replace(/\s{2,}/g, ""));
-        var whichKey = 0;
-        var timeslot = {};
+    for (i in TVAPP.targets) {
+      (function(dex) {
+        // begin request
+        request(TVAPP.targets[dex], function(error, response, body) {
+          if (!error && response.statusCode == 200) {
+
+            $ = cheerio.load(body.replace(/\s{2,}/g, ""));
+            var rootDate = JSON.stringify($("select[name='fDay'] option[selected]").html());
+            rootDate = moment(new Date(rootDate)).format().slice(0,11);
+            var whichKey = 0;
+            var timeslot = {};
+
+            $("table[bgcolor='#999999'] td").each(function(i, elem) {
+              // rootDate put here to make sure scraping correct target
+              var rootDate = JSON.stringify($("select[name='fDay'] option[selected]").html());
+              rootDate = moment(new Date(rootDate)).format().slice(0,11);
+
+              var elemtext = $(elem).text();
 
 
-        // traversal and assignment. building active data
-        TVAPP.activeData = (function() {
+              if (i > 5 && $(elem).html() != '<b>&#xA0;</b>') {
 
-          return {
-            // _root: this,
-            channel: $("select[name='fChannel'] option[selected]").html(),
-            date: moment( new Date($("select[name='fDay'] option[selected]").html())).format(),
-            daysFromNow: function(days) {
-              return moment(this.date).add('days', days).format()
-            },
-            timeslots: []
-          }
-        })();
+                switch(whichKey) {
+                  case 0:
+                    timeslot.channel = elemtext.trim();
+                    whichKey++;
+                    break;
+                  case 1:
+                    timeslot.time = moment(rootDate+elemtext).format();
+                    whichKey++;
+                    break;
+                  case 2:
+                    timeslot.title = elemtext;
+                    whichKey++;
+                    break;
+                  case 3:
+                    timeslot.mprs = elemtext;
+                    whichKey++;
+                    break;
+                  case 4:
+                    timeslot.description = elemtext;
+                    whichKey++;
+                    break;
+                }
 
-        // build timeslots
-        $("table[bgcolor='#999999'] td").each(function(i, elem) {
-          var elemtext = $(elem).text();
+                if (whichKey === 5) {
+                  TVAPP.activeData.push({
+                    channel:  timeslot.channel,
+                    date: timeslot.time,
+                    title : timeslot.title,
+                    mprs : timeslot.mprs,
+                    description : timeslot.description
+                  });
+                  testcount++;
+                  whichKey = 0;
+                  timeslot = {};
+                }
+              }
+            });
 
-          if (i > 5 && $(elem).html() != '<b>&#xA0;</b>') {
+            // find doc. if not exist, write new.
+            // TODO kill DB connection once finnished writing
+            for(o in TVAPP.activeData){
+              (function(o){
+                TVAPP.model.findOne({$and:[{date: TVAPP.activeData[o].date}, {channel: TVAPP.activeData[o].channel.trim()}]}, function(err, doc) {
+                    if (err) console.log(err);
 
-            switch(whichKey) {
-              case 0:
-                timeslot.channel = elemtext;
-                whichKey++;
-                break;
-              case 1:
-                timeslot.time = moment(TVAPP.activeData.date.slice(0,11) + elemtext + ':00').format();
-                whichKey++;
-                break;
-              case 2:
-                timeslot.title = elemtext;
-                whichKey++;
-                break;
-              case 3:
-                timeslot.msrp = elemtext;
-                whichKey++;
-                break;
-              case 4:
-                timeslot.description = elemtext;
-                timeslot.timeslot_id = uuid.v4();
-                whichKey++;
-                break;
+                    // only add new doc if it doesn't exist.
+                    if (doc !== null) {
+                        console.log(touchDB + ": " + TVAPP.activeData[o].channel + TVAPP.activeData[o].date + " already exists".red);
+                        touchDB++;
+                    } else {
+                        TVAPP.logic.addDocument(o);
+                    }
+                });
+              })(o);
             }
 
-            if (whichKey === 5) {
-              // console.log(TVAPP.activeData);
-              TVAPP.activeData.timeslots.push(timeslot);
-              whichKey = 0;
-              timeslot = {};
-            }
           }
         });
-
-
-        // update db here
-        TVAPP.model.findOne({$and:[{date: {$gte: TVAPP.activeData.date, $lt: TVAPP.activeData.daysFromNow(1)}},{channel: TVAPP.activeData.channel}]}, function(err, doc) {
-
-            if (err) console.log(err);
-
-            // only add new doc if it doesn't exist.
-            if (doc !== null) {
-                console.log('document already exists'.blue)
-                db.close();
-            } else {
-                TVAPP.logic.addDocument();
-            }
-        });
-
-
-      }
-    });
-    //end loop
-
-
+      })(i);
+    }
   }
   // /PRIMARY LOGIC
 
-  function addDocument() {
-
-    // var timeslots = TVAPP.activeData.timeslots;
+  function addDocument(o) {
 
     //build new db entry
     freshDoc = new TVAPP.model({
-        channel: TVAPP.activeData.channel,
-        date: TVAPP.activeData.date,
-        timeslots : []
+        channel: TVAPP.activeData[o].channel.trim(),
+        date: TVAPP.activeData[o].date,
+        title : TVAPP.activeData[o].title,
+        mprs : TVAPP.activeData[o].mprs,
+        description : TVAPP.activeData[o].description,
+        datewritten : moment().format()
     });
-
-    freshDoc.timeslots = TVAPP.activeData.timeslots;
 
     // write new obj to db
     freshDoc.save(function (err) {
         if (err) return console.error(err);
-        console.log("write success".rainbow);
-        console.log('new object created'.green);
-        db.close();
+        console.log(touchDB + ": write success for ".green + TVAPP.activeData[o].channel + TVAPP.activeData[o].date);
+        touchDB++;
     });
   }
 
