@@ -1,7 +1,8 @@
 {
-  "name": "SATVGuide",
-  "version": "0.0.0",
-  "description": "",
+  "name": "satvguide",
+  "version": "0.0.1",
+  "private": true,
+  "description": "South African Television Guide",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,6 +12,8 @@
   "dependencies": {
     "cheerio": "^0.17.0",
     "colors": "^0.6.2",
+    "express": "4.7.2",
+    "moment": "^2.7.0",
     "mongoose": "3.8.13",
     "node-uuid": "^1.4.1",
     "request": "^2.38.0"
