@@ -7,7 +7,9 @@
       cheerio = require('cheerio'),
       fs = require('fs'),
       util = require('util'),
+      async = require(async),
       request = require('request'),
+
       colors = require('colors');
 
   // track how many writes to DB.
