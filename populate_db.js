@@ -7,7 +7,7 @@
       cheerio = require('cheerio'),
       fs = require('fs'),
       util = require('util'),
-      async = require(async),
+      async = require('async'),
       request = require('request'),
 
       colors = require('colors');
