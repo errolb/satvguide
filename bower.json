@@ -1,0 +1,18 @@
+{
+  "name": "satvguide",
+  "version": "0.0.1",
+  "homepage": "https://github.com/errolb/satvguide",
+  "authors": [
+    "Errol Burger"
+  ],
+  "description": "South African TV Guide",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}

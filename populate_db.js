@@ -17,7 +17,7 @@
   // DB
   var db_address = (function(){
     var db_port = '27017',
-        db_name = /*'tvguidedb'*/"testgoose",
+        db_name = 'tvguidedb',
         db_base_location  = "mongodb://localhost";
     return db_base_location + ':' + db_port + '/' + db_name;
   })();
