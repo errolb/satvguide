@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+/**********
+
+ NOTE: The following code is pretty messy as a result of my misconceptions. I
+ have since disabused myself of many of these and hope to write cleaner code,
+ henceforth.
+
+***********/
+
 ;(function() {
 
   var mongoose = require('mongoose'),
@@ -42,10 +50,7 @@
               model: mongoose.model('schedule', this.schema),
               activeData: [],
               logic: {
-                // processURL: processURL,
-                // isAlreadyThere: isAlreadyThere,
-                thenFindDocuments: thenFindDocuments,
-                thenAddDocument: thenAddDocument
+                thenFindDocuments: thenFindDocuments
               }
             }
   })();
@@ -172,29 +177,6 @@
     });
 
   }
-  // /PRIMARY LOGIC
-
-  // function isAlreadyThere(){
-  //
-  //   // var findDocumentQueue = async.queue(function(task, callback){
-  //   //     TVAPP.logic.thenFindDocuments(task);
-  //   //     callback();
-  //   // }, 5);
-  //   //
-  //   // // this is .async process callback
-  //   // findDocumentQueue.drain = function() {
-  //   //   console.log('all URLs have been processed');
-  //   //   // TVAPP.logic.isAlreadyThere();
-  //   // };
-  //   //
-  //   // //  asign document to queue
-  //   // findDocumentQueue.push(TVAPP.activeData, function (err) {
-  //   //     console.log('finished processing URL');
-  //   // });
-  //
-  //   // console.log(TVAPP.activeData.length);
-  //
-  // }
 
   function thenFindDocuments() {
     var asyncDbLookups = [];
@@ -210,39 +192,39 @@
             if (doc !== null) {
                 console.log(touchDB + ": " + o.channel + o.date + " already exists".red);
                 touchDB++;
+                callback();
             } else {
-                TVAPP.logic.thenAddDocument(o);
+                // TVAPP.logic.thenAddDocument(o);
+
+                //build new db entry
+                freshDoc = new TVAPP.model({
+                    channel: o.channel.trim(),
+                    date: o.date,
+                    title : o.title,
+                    mprs : o.mprs,
+                    description : o.description,
+                    datewritten : moment().format()
+                });
+
+                // write new obj to db
+                freshDoc.save(function (err) {
+                    if (err) return console.error(err);
+                    console.log(touchDB + ": write success for ".green + o.channel + o.date);
+                    touchDB++;
+                    callback();
+                });
+
             }
-            callback();
+
         });
       });
     });
 
     async.parallelLimit(asyncDbLookups, 50, function() {
       console.log('All db touches done.'.rainbow);
+      db.close();
     })
-    // console.log("this is working");
 
-  }
-
-  function thenAddDocument(o) {
-
-    //build new db entry
-    freshDoc = new TVAPP.model({
-        channel: o.channel.trim(),
-        date: o.date,
-        title : o.title,
-        mprs : o.mprs,
-        description : o.description,
-        datewritten : moment().format()
-    });
-
-    // write new obj to db
-    freshDoc.save(function (err) {
-        if (err) return console.error(err);
-        console.log(touchDB + ": write success for ".green + o.channel + o.date);
-        touchDB++;
-    });
   }
 
 })();
