@@ -38,13 +38,14 @@
     });
 
     return  { _root: this,
-              targets:[],
+              urls:[],
               model: mongoose.model('schedule', this.schema),
               activeData: [],
               logic: {
                 processURL: processURL,
                 isAlreadyThere: isAlreadyThere,
-                addDocument: addDocument
+                thenFindDocument: thenFindDocument,
+                thenAddDocument: thenAddDocument
               }
             }
   })();
@@ -63,7 +64,7 @@
   function fsOnceFileRead(err, data) {
     if (err) throw err;
 
-    TVAPP.targets = (function() {
+    TVAPP.urls = (function() {
       var base_target     =  data.toString(),
           submit_key      = "fSubmit",
           day_key         = "fDay",
@@ -88,33 +89,19 @@
       return urls;
     })();
 
-    onceTargetsAcquired();
+    onceurlsAcquired();
   }
 
-  function onceTargetsAcquired() {
+  function onceurlsAcquired() {
 
-    // begin scraping
-    // loop through & request target URLs
-    var urlQueue = async.queue(function(task, callback){
-        TVAPP.logic.processURL(task);
-        callback();
-    }, 5);
+    // async.map(TVAPP.urls, )
 
-    // this is .async process callback
-    urlQueue.drain = function() {
-      console.log('all URLs have been processed');
-      TVAPP.logic.isAlreadyThere(o);
-    };
-
-    //  asign urls to queue
-    urlQueue.push(TVAPP.targets, function (err) {
-        console.log('finished processing URL');
-    });
+    async.map(TVAPP.urls, TVAPP.logic.);
 
   }
   // /PRIMARY LOGIC
 
-  function processURL(url) {
+  function processURL(url, callback) {
     request(url, function(error, response, body) {
       if (!error && response.statusCode == 200) {
 
@@ -158,19 +145,23 @@
             }
 
             if (whichKey === 5) {
-              TVAPP.activeData.push({
-                channel:  timeslot.channel,
-                date: timeslot.time,
-                title : timeslot.title,
-                mprs : timeslot.mprs,
-                description : timeslot.description
-              });
+              // TVAPP.activeData.push({
+              //   channel:  timeslot.channel,
+              //   date: timeslot.time,
+              //   title : timeslot.title,
+              //   mprs : timeslot.mprs,
+              //   description : timeslot.description
+              // });
+              callback(timeslot);
               testcount++;
               whichKey = 0;
               timeslot = {};
             }
+
+
           }
         });
+
 
         // find doc. if not exist, write new.
         // TODO kill DB connection once finnished writing
@@ -182,38 +173,61 @@
     });
   }
 
-  function isAlreadyThere(o){
-    TVAPP.model.findOne({$and:[{date: TVAPP.activeData[o].date}, {channel: TVAPP.activeData[o].channel.trim()}]}, function(err, doc) {
+  function isAlreadyThere(){
+
+    // var findDocumentQueue = async.queue(function(task, callback){
+    //     TVAPP.logic.thenFindDocument(task);
+    //     callback();
+    // }, 5);
+    //
+    // // this is .async process callback
+    // findDocumentQueue.drain = function() {
+    //   console.log('all URLs have been processed');
+    //   // TVAPP.logic.isAlreadyThere();
+    // };
+    //
+    // //  asign document to queue
+    // findDocumentQueue.push(TVAPP.activeData, function (err) {
+    //     console.log('finished processing URL');
+    // });
+
+    // console.log(TVAPP.activeData.length);
+
+  }
+
+  function thenFindDocument(o) {
+    // console.log("this is working");
+    TVAPP.model.findOne({$and:[{date: o.date}, {channel: o.channel.trim()}]}, function(err, doc) {
 
         console.log('checking to see if document is in db');
         if (err) console.log(err);
 
         // only add new doc if it doesn't exist.
         if (doc !== null) {
-            console.log(touchDB + ": " + TVAPP.activeData[o].channel + TVAPP.activeData[o].date + " already exists".red);
+            console.log(touchDB + ": " + o.channel + o.date + " already exists".red);
             touchDB++;
         } else {
-            TVAPP.logic.addDocument(o);
+            TVAPP.logic.thenAddDocument(o);
         }
     });
   }
 
-  function addDocument(o) {
+  function thenAddDocument(o) {
 
     //build new db entry
     freshDoc = new TVAPP.model({
-        channel: TVAPP.activeData[o].channel.trim(),
-        date: TVAPP.activeData[o].date,
-        title : TVAPP.activeData[o].title,
-        mprs : TVAPP.activeData[o].mprs,
-        description : TVAPP.activeData[o].description,
+        channel: o.channel.trim(),
+        date: o.date,
+        title : o.title,
+        mprs : o.mprs,
+        description : o.description,
         datewritten : moment().format()
     });
 
     // write new obj to db
     freshDoc.save(function (err) {
         if (err) return console.error(err);
-        console.log(touchDB + ": write success for ".green + TVAPP.activeData[o].channel + TVAPP.activeData[o].date);
+        console.log(touchDB + ": write success for ".green + o.channel + o.date);
         touchDB++;
     });
   }
