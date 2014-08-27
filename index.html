@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html ng-app="saTvGuide">
+<head>
+    <meta charset="UTF-8">
+    <title>SA TV Guide</title>
+    <link rel="stylesheet" type="text/css" href="/bower_components/bootstrap/dist/css/bootstrap.min.css">
+</head>
+<body>
+    
+    <div ng-controller="GuideCtrl as guide">
+        <!-- {{guide.schedules[0].channel}} -->
+
+        <div ng-repeat="channels in guide.schedules">
+            {{channels._id}}
+            {{guide.day}}
+            <!-- {{schedule[guide.today]}} -->
+            <div ng-reapet="channel in channels">
+                {{channel[guide.day]}}
+            </div>
+        </div>
+    </div>
+
+    <script src="/bower_components/angular/angular.min.js"></script>
+    <script src="/public/js/angular/ang-app.js"></script>
+</body>
+</html>
