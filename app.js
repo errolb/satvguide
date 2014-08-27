@@ -31,7 +31,7 @@ app.get('/api/tvguide/channel/:arg', function(req, res){
   });
 });
 
-//all data from a date specific date
+//all data from a specific date
 app.get('/api/tvguide/day/:arg', function(req, res){
   var db = req.db;
   var day = req.params.arg;
@@ -43,8 +43,6 @@ app.get('/api/tvguide/day/:arg', function(req, res){
   var queryDay = moment().startOf('day').add(day, 'days').subtract(2, 'hours').format()
   var nextDay = moment(queryDay).add(1, 'days').format() 
   collection.find({'date':{$gte: new Date(queryDay), $lt: new Date(nextDay)}},{},function(e, docs){
-  //collection.find({'date':{$gte: queryDay, $lt: nextDay}},{},function(e, docs){
-          //console.log(fullQuery);
       res.send(docs);
   });
 });
